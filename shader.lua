@@ -1,5 +1,5 @@
 -- ===================================================
--- KILLER_VOIDS EXPLOIT OVERRIDE: EVADE RTX SHADER V2 (FIXED)
+-- KILLER_VOIDS EXPLOIT OVERRIDE: EVADE RTX SHADER V2 (FIXED LANTAI)
 -- EXECUTE IN ROBLOX PLAYER VIA EXECUTOR
 -- ===================================================
 
@@ -10,46 +10,44 @@ local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 
-print("😈🔥 KILLER_VOIDS INJECTING RTX SHADER TO EVADE V2...")
+print("😈🔥 KILLER_VOIDS FIXING RTX SHADER: RESTORING FLOOR TEXTURE & REFLECTION...")
 
--- [1] INJEKSI LIGHTING (BIAR EFEK KACANYA MENGKILAP ALA RTX)
+-- [1] INJEKSI LIGHTING (Biar grafis tetap sinematik ala RTX)
 local function injectShaders()
     if not Lighting:FindFirstChild("KV_Color") then
         local cc = Instance.new("ColorCorrectionEffect")
         cc.Name = "KV_Color"
-        cc.Contrast = 0.2
-        cc.Saturation = 0.2
+        cc.Contrast = 0.15
+        cc.Saturation = 0.15
         cc.Parent = Lighting
         
         local bloom = Instance.new("BloomEffect")
         bloom.Name = "KV_Bloom"
-        bloom.Intensity = 0.4
-        bloom.Size = 20
-        bloom.Threshold = 2.0
+        bloom.Intensity = 0.3
+        bloom.Size = 24
+        bloom.Threshold = 1.5
         bloom.Parent = Lighting
     end
 end
 injectShaders()
 
--- [2] AUTO-SCAN MAP EVADE (UBAH LANTAI JADI KACA)
+-- [2] AUTO-SCAN MAP EVADE (FIX: Jangan ubah jadi Glass transparan, biarkan tekstur asli tapi buat mengkilap)
 task.spawn(function()
     while task.wait(3) do
         for _, obj in pairs(Workspace:GetDescendants()) do
             if obj:IsA("BasePart") and not obj.Parent:FindFirstChild("Humanoid") then
-                -- FIX: Tambah filter obj.Size.Y < 5. Tembok pasti tingginya lebih dari 5, 
-                -- jadi yang ke-filter cuma part datar (lantai/jalan).
-                if obj.Size.X > 15 and obj.Size.Z > 15 and obj.Size.Y < 5 and obj.Material ~= Enum.Material.Glass then
-                    obj.Material = Enum.Material.Glass
-                    obj.Transparency = 0.8 -- FIX: Ditipisin dari 0.55 jadi 0.8 biar lebih bening
-                    obj.Reflectance = 0.45 -- Pantulan diterangin dikit biar bayangan lebih kontras
-                    obj.Color = Color3.fromRGB(15, 15, 20)
+                -- Filter part datar besar (lantai/jalan)
+                if obj.Size.X > 15 and obj.Size.Z > 15 and obj.Size.Y < 5 then
+                    -- JANGAN UBAH JADI GLASS SUPAYA GA TEMBUS PANDANG KE BAWAH VOID!
+                    -- Kita cukup naikin Reflectance-nya biar lantai jadi glossy/memantul
+                    obj.Reflectance = 0.35 
                 end
             end
         end
     end
 end)
 
--- [3] INJEKSI KLONINGAN BAYANGAN (ANTI-LAG, BYPASS RIG & VOID)
+-- [3] INJEKSI KLONINGAN BAYANGAN (DIKONTROL SUPAYA MUNCUL JELAS DI BAWAH)
 local cloneFolder = Workspace:FindFirstChild("KV_ReflectionFolder")
 if not cloneFolder then
     cloneFolder = Instance.new("Folder")
@@ -71,7 +69,6 @@ local function deployExploitClone()
     
     if not rootPart then return end
     
-    -- FIX: Paksa semua part di dalem karakter lu jadi Archivable sebelum di clone
     for _, p in pairs(character:GetDescendants()) do
         if p:IsA("Instance") then p.Archivable = true end
     end
@@ -90,19 +87,19 @@ local function deployExploitClone()
             child.Massless = true
             
             if child.Name == "HumanoidRootPart" then
-                child.Anchored = true -- FIX: Biar kloningan kaga jatuh ke Void karena engine fisika ngawur
+                child.Anchored = true
                 child.Transparency = 1
             else
                 child.Anchored = false
-                child.Color = Color3.fromRGB(20, 20, 30)
-                child.Material = Enum.Material.ForceField -- Pakai Forcefield biar bayangan nembus kaca kelihatan futuristik
-                child.Transparency = 0.3 -- Paksa muncul dengan opasitas solid
+                child.Color = Color3.fromRGB(10, 10, 15) -- Warna bayangan gelap elegan
+                child.Material = Enum.Material.SmoothPlastic -- Pakai plastik mulus biar bayangan solid kelihatan
+                child.Transparency = 0.45 -- Pas tidak terlalu pudar tapi tetap kelihatan kayak bayangan cermin
             end
         elseif child:IsA("Humanoid") then
             child.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
             child.PlatformStand = true
         elseif child:IsA("Decal") or child:IsA("Texture") then
-            child.Transparency = 0.5 -- Biar muka di bayangan tetep render tipis-tipis
+            child.Transparency = 0.6
         end
     end
     
@@ -129,11 +126,10 @@ local function deployExploitClone()
         local charCFrame = rootPart.CFrame
         local distFromFloor = charCFrame.Y - floorY
         
-        -- Offset cermin ditarik sedikiiit aja ke atas (+0.1) biar ga ketimpa ketebalan kaca
-        local mirrorPos = Vector3.new(charCFrame.X, floorY - distFromFloor + 0.1, charCFrame.Z)
+        -- Posisi cermin disesuaikan persis di atas lantai tanpa tembus ke bawah
+        local mirrorPos = Vector3.new(charCFrame.X, floorY - distFromFloor + 0.05, charCFrame.Z)
         local mirrorCFrame = CFrame.new(mirrorPos) * (charCFrame.Rotation * CFrame.Angles(0, 0, math.pi))
         
-        -- FIX: Pakai PivotTo buat mindahin entire model sekaligus biar gak ada part yang ketinggalan/ilang
         clone:PivotTo(mirrorCFrame)
         
         for _, motor in pairs(character:GetDescendants()) do
@@ -148,7 +144,7 @@ local function deployExploitClone()
 end
 
 LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1.5) -- Delay diperpanjang dikit buat nunggu Evade kelar loading rig custom-nya
+    task.wait(1.5)
     deployExploitClone()
 end)
 
@@ -156,4 +152,4 @@ if LocalPlayer.Character then
     deployExploitClone()
 end
 
-print("😈🔥 KILLER_VOIDS: EVADE RTX V2 INJECTION SUCCESS! GAS MAIN!")
+print("😈🔥 KILLER_VOIDS: FIXED! LANTAI KEMBALI NORMAL & REFLEKSI MUNCUL SEMPURNA!")
