@@ -1,53 +1,49 @@
 -- ===================================================
--- KILLER_VOIDS EVADE HARDCORE REFLECTION SHADER
+-- KILLER_VOIDS CLEAN & NATURAL SHADER (NO GLARE)
 -- ===================================================
 
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = game:GetService("Players").LocalPlayer
 
--- 1. EFEK VISUAL LIGHTING (Pasti Kelihatan Perbedaannya)
+-- 1. FIX LIGHTING & SHADOW (Bikin Bayangan Tegas & Gak Silau)
+Lighting.GlobalShadows = true
+
 local ColorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
-ColorCorrection.Brightness = 0.05
-ColorCorrection.Contrast = 0.25
-ColorCorrection.Saturation = 0.1
+ColorCorrection.Brightness = 0
+ColorCorrection.Contrast = 0.1
+ColorCorrection.Saturation = 0.15
 
 local Bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect", Lighting)
-Bloom.Intensity = 0.6
-Bloom.Size = 24
-Bloom.Threshold = 0.6
+Bloom.Intensity = 0.15 -- Dikecilkan biar api/cahaya gak meledak
+Bloom.Size = 12
+Bloom.Threshold = 0.95
 
--- 2. FUNGSI PAKSA LANTAI JADI KACA & HAPUS TEKSTUR
-local function forceReflection(object)
-    -- Abaikan karakter player & NPC
+-- 2. DEDIKASI KHUSUS LANTAI / ROAD (Gak Kena ke Pohon/Mobil)
+local function applyNaturalReflection(object)
     if object:IsA("BasePart") and not object:IsDescendantOf(LocalPlayer.Character or script) then
-        -- Cek apakah objek merupakan part map (bukan item kecil/senjata)
-        if object.Size.X > 5 or object.Size.Z > 5 or object.Size.Y > 5 then
-            
-            -- Hapus tekstur/decal yang menutupi pantulan kaca
-            for _, child in pairs(object:GetChildren()) do
-                if child:IsA("Texture") or child:IsA("Decal") then
-                    child:Destroy()
-                end
-            end
-            
-            -- Paksa ubah material dan tingkat pantulan
-            object.Material = Enum.Material.Glass
-            object.Reflectance = 0.8 -- Nilai tinggi biar langsung kelihatan efek lantainya
+        local nameLower = string.lower(object.Name)
+        
+        -- Deteksi khusus jalan, lantai, atau part pijakan lebar
+        local isFloor = nameLower:find("road") or nameLower:find("street") or nameLower:find("floor") or nameLower:find("asphalt") or nameLower:find("ground")
+        local isWidePart = (object.Size.X > 25 and object.Size.Z > 25 and object.Size.Y < 5)
+
+        if isFloor or isWidePart then
+            -- Gunakan SmoothPlastic + Reflectance Halus (Bikin Efek Glossy/Basah Natural)
+            object.Material = Enum.Material.SmoothPlastic
+            object.Reflectance = 0.18 -- Nilai pas biar gak bikin sakit mata
         end
     end
 end
 
--- Terapkan ke seluruh Map Evade
+-- Terapkan ke Map
 for _, child in pairs(Workspace:GetDescendants()) do
-    forceReflection(child)
+    applyNaturalReflection(child)
 end
 
--- Terapkan ke objek baru yang muncul/loaded
 Workspace.DescendantAdded:Connect(function(child)
     task.wait(0.05)
-    forceReflection(child)
+    applyNaturalReflection(child)
 end)
 
-print("KILLER_VOIDS Evade Glass Shader Loaded! 😈🔥")
+print("KILLER_VOIDS Clean Shader Applied! 😈🔥")
