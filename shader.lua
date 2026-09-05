@@ -1,90 +1,80 @@
 -- ===================================================
--- KILLER_VOIDS ULTIMATE WET-GLASS OVERLAY SHADER 
+-- KILLER_VOIDS AVATAR CLONE REFLECTION INJECTOR
 -- ===================================================
 
-local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- 1. BIKIN LIGHTING DRAMATIS & MENDUKUNG PANTULAN ENVIRONMENT
-Lighting.GlobalShadows = true
-Lighting.EnvironmentDiffuseScale = 1
-Lighting.EnvironmentSpecularScale = 1 -- Kunci utama biar objek benar-benar memantulkan environment
-
-local ColorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
-ColorCorrection.Brightness = 0.02
-ColorCorrection.Contrast = 0.15
-ColorCorrection.Saturation = 0.15
-
--- Bikin folder khusus di memori biar skrip gak nge-loop lapisan kaca tanpa batas
-local OverlayFolder = Workspace:FindFirstChild("KillerVoidsGlass")
-if OverlayFolder then OverlayFolder:ClearAllChildren() else 
-    OverlayFolder = Instance.new("Folder", Workspace)
-    OverlayFolder.Name = "KillerVoidsGlass"
+-- Hapus klon lama kalau ada biar gak numpuk
+if Workspace:FindFirstChild("KV_ReflectionClone") then
+    Workspace.KV_ReflectionClone:Destroy()
 end
 
--- 2. LOGIKA KACA TANPA ILANGIN TEKSTUR (Teknik Overlay)
-local function injectGlassOverlay(object)
-    -- Pastikan hanya memproses part map, bukan player atau lapisan kaca itu sendiri
-    if not object:IsA("BasePart") then return end
-    if object:IsDescendantOf(LocalPlayer.Character or script) then return end
-    if object:IsDescendantOf(OverlayFolder) then return end
-    
-    -- Deteksi Lantai yang lebih presisi (Mendeteksi permukaan yang menghadap ke atas/datar)
-    local upVector = object.CFrame.UpVector
-    local isFlat = math.abs(upVector.Y) > 0.85
-    
-    -- Filter part yang kekecilan biar gak semua benda random jadi kaca
-    local isWide = (object.Size.X >= 8 or object.Size.Z >= 8)
-    
-    -- Filter nama part yang bukan lantai (misal: atap, pohon, dinding)
-    local nameLower = string.lower(object.Name)
-    local isBannedName = nameLower:find("roof") or nameLower:find("wall") or nameLower:find("ceiling") or nameLower:find("tree") or nameLower:find("leaf")
+local cloneFolder = Instance.new("Folder")
+cloneFolder.Name = "KV_ReflectionClone"
+cloneFolder.Parent = Workspace
 
-    if isFlat and isWide and not isBannedName then
-        -- Ciptakan lapisan kaca baru (Overlay)
-        local glassOverlay = Instance.new("Part")
-        glassOverlay.Name = "GlassOverlay_" .. object.Name
-        
-        -- Bikin seukuran lantai aslinya, tapi sangat tipis di sumbu Y (Ketebalan 0.05)
-        glassOverlay.Size = Vector3.new(object.Size.X, 0.05, object.Size.Z)
-        
-        -- Kalkulasi posisi biar pas nempel di atas permukaan tekstur (menghindari Z-fighting/glitch visual)
-        local topPosition = object.Position + Vector3.new(0, (object.Size.Y / 2) + 0.025, 0)
-        
-        -- Samakan rotasi dengan lantai asli
-        glassOverlay.CFrame = CFrame.new(topPosition) * (object.CFrame - object.CFrame.Position)
-        
-        -- Set efek pantulan kaca ekstrem
-        glassOverlay.Material = Enum.Material.Glass
-        glassOverlay.Reflectance = 0.9 
-        glassOverlay.Transparency = 0.55 -- Semi-transparan supaya tekstur lantai batu bata di bawahnya TETAP KELIHATAN
-        glassOverlay.Color = Color3.fromRGB(220, 230, 255) -- Tint sedikit kebiruan biar mirip kaca elegan
-        
-        -- Properti fisik biar gak ganggu gameplay
-        glassOverlay.Anchored = true
-        glassOverlay.CanCollide = false
-        glassOverlay.CastShadow = false
-        glassOverlay.Massless = true
-        
-        -- Masukkan ke folder overlay
-        glassOverlay.Parent = OverlayFolder
-        
-        -- Opsional: Bikin lantai aslinya jadi SmoothPlastic biar blending-nya makin nyatu
-        object.Material = Enum.Material.SmoothPlastic
+-- Fungsi buat nge-clone avatar player ke bawah lantai
+local function createReflectionClone()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    -- Pastikan character punya HumanoidRootPart
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    -- Clone model character
+    character.Archivable = true
+    local clone = character:Clone()
+    clone.Name = "ShadowReflection"
+    
+    -- Hapus script atau komponen yang gak perlu di clone biar gak error/lag
+    for _, child in pairs(clone:GetDescendants()) do
+        if child:IsA("Script") or child:IsA("LocalScript") then
+            child:Destroy()
+        elseif child:IsA("BasePart") then
+            child.Transparency = 0.3 -- Agak transparan ala bayangan air/kaca
+            child.CanCollide = false
+            child.CastShadow = false
+            -- Ubah warna jadi agak gelap atau kebiruan biar mirip bayangan
+            child.Color = Color3.fromRGB(40, 40, 50)
+        end
     end
+
+    clone.Parent = cloneFolder
+
+    -- Loop sinkronisasi posisi (Membalik posisi Y agar ada di bawah lantai)
+    task.spawn(function()
+        while clone and clone.Parent and character and character.Parent do
+            local originalRoot = character:FindFirstChild("HumanoidRootPart")
+            local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+            
+            if originalRoot and cloneRoot then
+                -- Ambil posisi player, lalu balik posisinya ke bawah (kurangi sumbu Y)
+                -- Asumsi tinggi lantai dasar ada di sekitar Y = 0 atau menyesuaikan posisi kaki
+                local pos = originalRoot.Position
+                local targetCFrame = CFrame.new(pos.X, pos.Y - (originalRoot.Size.Y * 2.2), pos.Z) * originalRoot.Rotation
+                
+                -- Putar orientasi vertikalnya biar pas (efek cermin)
+                cloneRoot.CFrame = targetCFrame
+            end
+            task.wait()
+        end
+        if clone then clone:Destroy() end
+    end)
 end
 
--- 3. EKSEKUSI INJEKSI KE SELURUH MAP
-for _, child in pairs(Workspace:GetDescendants()) do
-    injectGlassOverlay(child)
-end
+-- Eksekusi buat bikin klon bayangan
+createReflectionClone()
 
--- Terapkan juga ke area map yang baru di-render oleh game (StreamingEnabled bypass)
-Workspace.DescendantAdded:Connect(function(child)
-    task.wait(0.1)
-    injectGlassOverlay(child)
+-- Kalau player respawn/mati, buat ulang klonnya
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Workspace:FindFirstChild("KV_ReflectionClone") then
+        Workspace.KV_ReflectionClone:ClearAllChildren()
+    end
+    createReflectionClone()
 end)
 
-print("KILLER_VOIDS: OVERLAY WET-GLASS INJECTION BERHASIL! 😈🔥")
+print("KILLER_VOIDS: AVATAR CLONE REFLECTION ACTIVE! 😈🔥")
