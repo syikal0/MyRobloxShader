@@ -1,80 +1,152 @@
 -- ===================================================
--- KILLER_VOIDS AVATAR CLONE REFLECTION INJECTOR
+-- KILLER_VOIDS EXPLOIT OVERRIDE: EVADE RTX SHADER & REFLECTION
+-- EXECUTE IN ROBLOX PLAYER VIA EXECUTOR
 -- ===================================================
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
 local LocalPlayer = Players.LocalPlayer
 
--- Hapus klon lama kalau ada biar gak numpuk
-if Workspace:FindFirstChild("KV_ReflectionClone") then
-    Workspace.KV_ReflectionClone:Destroy()
+print("😈🔥 KILLER_VOIDS INJECTING RTX SHADER TO EVADE...")
+
+-- [1] INJEKSI LIGHTING (BIAR EFEK KACANYA MENGKILAP ALA RTX)
+local function injectShaders()
+    if not Lighting:FindFirstChild("KV_Color") then
+        local cc = Instance.new("ColorCorrectionEffect")
+        cc.Name = "KV_Color"
+        cc.Contrast = 0.25
+        cc.Saturation = 0.3
+        cc.Parent = Lighting
+        
+        local bloom = Instance.new("BloomEffect")
+        bloom.Name = "KV_Bloom"
+        bloom.Intensity = 0.6
+        bloom.Size = 24
+        bloom.Threshold = 1.5
+        bloom.Parent = Lighting
+    end
+end
+injectShaders()
+
+-- [2] AUTO-SCAN MAP EVADE (UBAH LANTAI JADI KACA)
+-- Berjalan di background biar tiap ronde ganti map, lantainya tetep jadi kaca
+task.spawn(function()
+    while task.wait(3) do -- Cek tiap 3 detik biar gak bikin executor crash
+        -- Evade biasanya masukin map ke Workspace. Cek semua part gede
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            -- Abaikan karakter player/bot biar gak ikutan jadi kaca
+            if obj:IsA("BasePart") and not obj.Parent:FindFirstChild("Humanoid") then
+                -- Targetin part yang lumayan lebar (biasanya lantai/jalan)
+                if obj.Size.X > 15 and obj.Size.Z > 15 and obj.Material ~= Enum.Material.Glass then
+                    obj.Material = Enum.Material.Glass
+                    obj.Transparency = 0.55 -- Transparan biar bayangan nembus
+                    obj.Reflectance = 0.35 -- Mantulin cahaya (Glossy)
+                    obj.Color = Color3.fromRGB(15, 15, 20) -- Warna dark biar elegan
+                end
+            end
+        end
+    end
+end)
+
+-- [3] INJEKSI KLONINGAN BAYANGAN (ANTI-LAG & BYPASS EVADE RIG)
+local cloneFolder = Workspace:FindFirstChild("KV_ReflectionFolder")
+if not cloneFolder then
+    cloneFolder = Instance.new("Folder")
+    cloneFolder.Name = "KV_ReflectionFolder"
+    cloneFolder.Parent = Workspace
+else
+    cloneFolder:ClearAllChildren()
 end
 
-local cloneFolder = Instance.new("Folder")
-cloneFolder.Name = "KV_ReflectionClone"
-cloneFolder.Parent = Workspace
+local reflectionConnection
 
--- Fungsi buat nge-clone avatar player ke bawah lantai
-local function createReflectionClone()
-    local character = LocalPlayer.Character
-    if not character then return end
+local function deployExploitClone()
+    if reflectionConnection then
+        reflectionConnection:Disconnect()
+    end
     
-    -- Pastikan character punya HumanoidRootPart
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-
-    -- Clone model character
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart", 5)
+    
+    if not rootPart then return end -- Kalo lagi mati/spectate, batalkan
+    
     character.Archivable = true
     local clone = character:Clone()
-    clone.Name = "ShadowReflection"
+    clone.Name = "KV_SHADOW_CLONE"
     
-    -- Hapus script atau komponen yang gak perlu di clone biar gak error/lag
+    -- Hapus sampah dari klonan biar exploit lu gak ke-detect anti-cheat
     for _, child in pairs(clone:GetDescendants()) do
         if child:IsA("Script") or child:IsA("LocalScript") then
             child:Destroy()
         elseif child:IsA("BasePart") then
-            child.Transparency = 0.3 -- Agak transparan ala bayangan air/kaca
             child.CanCollide = false
             child.CastShadow = false
-            -- Ubah warna jadi agak gelap atau kebiruan biar mirip bayangan
-            child.Color = Color3.fromRGB(40, 40, 50)
+            child.Massless = true
+            if child.Name ~= "HumanoidRootPart" then
+                child.Color = Color3.fromRGB(30, 30, 40)
+                child.Material = Enum.Material.SmoothPlastic
+            end
+        elseif child:IsA("Humanoid") then
+            child.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+            child.PlatformStand = true -- Lumpuhkan humanoid klonan biar diem
         end
     end
-
+    
     clone.Parent = cloneFolder
-
-    -- Loop sinkronisasi posisi (Membalik posisi Y agar ada di bawah lantai)
-    task.spawn(function()
-        while clone and clone.Parent and character and character.Parent do
-            local originalRoot = character:FindFirstChild("HumanoidRootPart")
-            local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
-            
-            if originalRoot and cloneRoot then
-                -- Ambil posisi player, lalu balik posisinya ke bawah (kurangi sumbu Y)
-                -- Asumsi tinggi lantai dasar ada di sekitar Y = 0 atau menyesuaikan posisi kaki
-                local pos = originalRoot.Position
-                local targetCFrame = CFrame.new(pos.X, pos.Y - (originalRoot.Size.Y * 2.2), pos.Z) * originalRoot.Rotation
-                
-                -- Putar orientasi vertikalnya biar pas (efek cermin)
-                cloneRoot.CFrame = targetCFrame
-            end
-            task.wait()
+    
+    -- Sync posisi & animasi secara brutal tiap frame!
+    reflectionConnection = RunService.RenderStepped:Connect(function()
+        if not character or not character.Parent or not clone or not clone.Parent or character.Humanoid.Health <= 0 then
+            return
         end
-        if clone then clone:Destroy() end
+        
+        local rayOrigin = rootPart.Position
+        local rayDirection = Vector3.new(0, -50, 0)
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {character, cloneFolder}
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+        local floorY = rootPart.Position.Y - (rootPart.Size.Y * 1.5)
+        
+        if raycastResult then
+            floorY = raycastResult.Position.Y
+        end
+        
+        local charCFrame = rootPart.CFrame
+        local distFromFloor = charCFrame.Y - floorY
+        
+        -- Proyeksi cermin ke bawah
+        local mirrorPos = Vector3.new(charCFrame.X, floorY - distFromFloor, charCFrame.Z)
+        local mirrorCFrame = CFrame.new(mirrorPos) * (charCFrame.Rotation * CFrame.Angles(0, 0, math.pi))
+        
+        local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+        if cloneRoot then
+            cloneRoot.CFrame = mirrorCFrame
+        end
+        
+        -- Paksa sinkronisasi engsel pergerakan Evade
+        for _, motor in pairs(character:GetDescendants()) do
+            if motor:IsA("Motor6D") then
+                local cloneMotor = clone:FindFirstChild(motor.Name, true)
+                if cloneMotor and cloneMotor:IsA("Motor6D") then
+                    cloneMotor.Transform = motor.Transform
+                end
+            end
+        end
     end)
 end
 
--- Eksekusi buat bikin klon bayangan
-createReflectionClone()
-
--- Kalau player respawn/mati, buat ulang klonnya
 LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    if Workspace:FindFirstChild("KV_ReflectionClone") then
-        Workspace.KV_ReflectionClone:ClearAllChildren()
-    end
-    createReflectionClone()
+    task.wait(1) -- Tunggu rig Evade ke-load sempurna di client
+    deployExploitClone()
 end)
 
-print("KILLER_VOIDS: AVATAR CLONE REFLECTION ACTIVE! 😈🔥")
+if LocalPlayer.Character then
+    deployExploitClone()
+end
+
+print("😈🔥 KILLER_VOIDS: EVADE RTX INJECTION SUCCESS! GAS MAIN!")
