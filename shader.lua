@@ -1,49 +1,53 @@
 -- ===================================================
--- KILLER_VOIDS CLEAN & NATURAL SHADER (NO GLARE)
+-- KILLER_VOIDS STRICT FLOOR-ONLY GLASS SHADER
 -- ===================================================
 
-local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
--- 1. FIX LIGHTING & SHADOW (Bikin Bayangan Tegas & Gak Silau)
+-- 1. FIX LIGHTING & HAPUS SILAU (Biar bayangan tegas & mata gak sakit)
 Lighting.GlobalShadows = true
+local Bloom = Lighting:FindFirstChildOfClass("BloomEffect")
+if Bloom then 
+    Bloom.Intensity = 0.05 -- Matiin silau lampu/api biar gak over-exposed
+end
+local ColorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+if ColorCorrection then
+    ColorCorrection.Brightness = 0
+    ColorCorrection.Contrast = 0.1
+end
 
-local ColorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
-ColorCorrection.Brightness = 0
-ColorCorrection.Contrast = 0.1
-ColorCorrection.Saturation = 0.15
-
-local Bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect", Lighting)
-Bloom.Intensity = 0.15 -- Dikecilkan biar api/cahaya gak meledak
-Bloom.Size = 12
-Bloom.Threshold = 0.95
-
--- 2. DEDIKASI KHUSUS LANTAI / ROAD (Gak Kena ke Pohon/Mobil)
-local function applyNaturalReflection(object)
+-- 2. LOGIKA SUPER KETAT HANYA UNTUK LANTAI / PIJAKAN
+local function makeFloorGlassOnly(object)
     if object:IsA("BasePart") and not object:IsDescendantOf(LocalPlayer.Character or script) then
-        local nameLower = string.lower(object.Name)
         
-        -- Deteksi khusus jalan, lantai, atau part pijakan lebar
-        local isFloor = nameLower:find("road") or nameLower:find("street") or nameLower:find("floor") or nameLower:find("asphalt") or nameLower:find("ground")
-        local isWidePart = (object.Size.X > 25 and object.Size.Z > 25 and object.Size.Y < 5)
+        -- Rumus Deteksi Lantai: Lebarnya harus gede (X dan Z > 20), tapi tipis/ceper (Y <= 5)
+        local isFloorShape = (object.Size.X > 20 and object.Size.Z > 20 and object.Size.Y <= 5)
+        
+        -- Deteksi tambahan dari nama part
+        local nameLower = string.lower(object.Name)
+        local isFloorName = nameLower:find("floor") or nameLower:find("ground") or nameLower:find("road") or nameLower:find("asphalt")
 
-        if isFloor or isWidePart then
-            -- Gunakan SmoothPlastic + Reflectance Halus (Bikin Efek Glossy/Basah Natural)
-            object.Material = Enum.Material.SmoothPlastic
-            object.Reflectance = 0.18 -- Nilai pas biar gak bikin sakit mata
+        -- JIKA BENERAN LANTAI, UBAH JADI KACA! Sisa objek hiraukan.
+        if isFloorShape or isFloorName then
+            object.Material = Enum.Material.Glass
+            object.Reflectance = 1 -- Mentokin ke 1 biar pantulan cahaya/langit maksimal kayak kaca basah
+            
+            -- Jangan hapus tekstur biar tetap natural, cukup timpa materialnya.
         end
     end
 end
 
--- Terapkan ke Map
+-- Terapkan ke semua objek di map
 for _, child in pairs(Workspace:GetDescendants()) do
-    applyNaturalReflection(child)
+    makeFloorGlassOnly(child)
 end
 
+-- Terapkan ke area map yang baru ke-load
 Workspace.DescendantAdded:Connect(function(child)
     task.wait(0.05)
-    applyNaturalReflection(child)
+    makeFloorGlassOnly(child)
 end)
 
-print("KILLER_VOIDS Clean Shader Applied! 😈🔥")
+print("KILLER_VOIDS: Misi Selesai! Cuma Lantai yang jadi Kaca! 😈🔥")
